@@ -14,7 +14,7 @@ class Agent:
     # threshold of being the same image
     def sameImages(self, image1, image2):
         result = cv2.matchTemplate(image1, image2, cv2.TM_CCOEFF_NORMED)
-        if result > .85:
+        if result > .9:
             return True
         else:
             return False
@@ -44,6 +44,20 @@ class Agent:
             imageDictDPR[key] = numBlackPix, numWhitePix, dpr
         return imageDictDPR
 
+    # Helper Function for Calculating IPR
+    # IPR calculation modified from:
+    # https://www.davidjoyner.net/blog/wp-content/uploads/2015/05/JoynerBedwellGrahamLemmonMartinezGoel-ICCC2015-Distribution.pdf
+    def calcIPR(self, image1, image2):
+        check = (image1 == 0)[image2 == 0]
+        numSharedBlackPix = sum(check)
+        numBlackPix1 = np.sum(image1 == 0)
+        numBlackPix2 = np.sum(image2 == 0)
+        if numBlackPix1 == 0 or numBlackPix2 == 0:
+            ipr = 0
+        else:
+            ipr = (numSharedBlackPix / numBlackPix1) - (numSharedBlackPix / numBlackPix2)
+        return ipr
+
     def read_image(self, problem):
         self.answer_guesses = []
         path = 'Basic Problems\\%s\\' % problem
@@ -70,7 +84,12 @@ class Agent:
         if len(answers) == 0:
             answers = [0]
         # print(answers)
-        return answers[0]
+        if len(answers) > 1:
+            print(answers)
+            answers = random.choice(answers)
+            return answers
+        else:
+            return answers[0]
 
     # We will attempt to find our best guesses for the problem in this method
     def solve_problem(self, input_images, image_answers):
@@ -101,6 +120,55 @@ class Agent:
                 if check:
                     self.answer_guesses.append(int(key))
 
+        # Input Images are only Same Across Vertical
+        if acSame and not abSame:
+            for key in potential_answers:
+                check = self.sameImages(image1=input_images['B'], image2=potential_answers[key])
+                if check:
+                    self.answer_guesses.append(int(key))
+
+        # Bitwise checks
+        if len(self.answer_guesses) == 0:
+            row1XOR = np.logical_xor(input_images['A'], input_images['B'])
+            row1AND = np.logical_and(input_images['A'], input_images['B'])
+            row1OR = np.logical_or(input_images['A'], input_images['B'])
+            row1XOR = row1XOR.astype(np.uint8)
+            row1XOR *= 255
+            row1AND = row1AND.astype(np.uint8)
+            row1AND *= 255
+            row1OR = row1OR.astype(np.uint8)
+            row1OR *= 255
+            if self.sameImages(image1=row1AND, image2=input_images['B']):
+                for key in potential_answers:
+                    row2AND = np.logical_and(input_images['C'], potential_answers[key])
+                    row2AND = row2AND.astype(np.uint8)
+                    row2AND *= 255
+                    # cv2.imshow("", row2AND)
+                    # cv2.waitKey(0)
+                    if self.sameImages(image1=row2AND, image2=input_images['C']):
+                        self.answer_guesses.append(int(key))
+            if self.sameImages(image1=row1XOR, image2=input_images['B']):
+                for key in potential_answers:
+                    row2XOR = np.logical_xor(input_images['C'], potential_answers[key])
+                    row2XOR = row2XOR.astype(np.uint8)
+                    row2XOR *= 255
+                    # cv2.imshow("", row2AND)
+                    # cv2.waitKey(0)
+                    if self.sameImages(image1=row2XOR, image2=input_images['C']):
+                        self.answer_guesses.append(int(key))
+            if self.sameImages(image1=row1OR, image2=input_images['B']):
+                for key in potential_answers:
+                    row2OR = np.logical_or(input_images['C'], potential_answers[key])
+                    row2OR = row2OR.astype(np.uint8)
+                    row2OR *= 255
+                    # cv2.imshow("", row2AND)
+                    # cv2.waitKey(0)
+                    if self.sameImages(image1=row2OR, image2=input_images['C']):
+                        self.answer_guesses.append(int(key))
+
+
+        # DPR and IPR are more resource intensive so if we already have an asnwer because the problem is basic,
+        # Then let us skip this
         if len(self.answer_guesses) == 0:
             # Let's Calculate the Dark Pixel Ratio of the Input Image Dictionary
             input_images_DPR = self.calculateDPR(imagesDict=input_images)
@@ -108,17 +176,23 @@ class Agent:
             # Let's Calculate the Dark Pixel Ratio of the Potential Answers
             answer_images_DPR = self.calculateDPR(imagesDict=potential_answers)
 
+            # IPR Checks
+            abIPR = self.calcIPR(image1=input_images['A'], image2=input_images['B'])
+            acIPR = self.calcIPR(image1=input_images['A'], image2=input_images['C'])
+
             # Let's Calculate the DPR Ratio for A&B and A&C
             abPerc = (input_images_DPR['B'][2] - input_images_DPR['A'][2]) / input_images_DPR['A'][2]
             acPerc = (input_images_DPR['C'][2] - input_images_DPR['A'][2]) / input_images_DPR['A'][2]
             for key in potential_answers:
                 # If the DPR ratio of input image C and the current key is within +- .05 of the AB DPR then True
                 ab_DPR_match = abPerc - .05 <= ((answer_images_DPR[key][2] - input_images_DPR['C'][2]) / input_images_DPR['C'][2]) <= abPerc + .05
+                ab_IPR_match = abIPR - .001 <= self.calcIPR(image1=input_images['C'], image2=potential_answers[key]) <= abIPR + .001
                 # If the DPR ratio of input image B and the current key is within +- .05 of the AC DPR then True
                 ac_DPR_match = acPerc - .05 <= ((answer_images_DPR[key][2] - input_images_DPR['B'][2]) / input_images_DPR['B'][2]) <= acPerc + .05
-                if ab_DPR_match:
+                ac_IPR_match = acIPR - .001 <= self.calcIPR(image1=input_images['B'], image2=potential_answers[key]) <= acIPR + .001
+                if ab_DPR_match and ab_IPR_match:
                     self.answer_guesses.append(int(key))
-                elif ac_DPR_match:
+                elif ac_DPR_match and ac_IPR_match:
                     self.answer_guesses.append(int(key))
 
         return self.answer_guesses
