@@ -23,7 +23,7 @@ class Agent:
     def eliminateImages(self, input_dict, image_dict, potential_ans):
         for key in image_dict:
             if self.sameImages(input_dict['A'], image_dict[key]) or self.sameImages(input_dict['B'], image_dict[key]) or self.sameImages(input_dict['C'], image_dict[key]):
-                print("Eliminated: ", key)
+                # print("Eliminated: ", key)
                 del potential_ans[key]
 
         return potential_ans
@@ -67,7 +67,9 @@ class Agent:
         # cv2.waitKey(0)
 
         answers = self.solve_problem(input_images=input_images_dict, image_answers=image_answers_dict)
-        print(answers)
+        if len(answers) == 0:
+            answers = [0]
+        # print(answers)
         return answers[0]
 
     # We will attempt to find our best guesses for the problem in this method

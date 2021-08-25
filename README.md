@@ -1,2 +1,4 @@
 # Image Recognition Fun
- Solving RPM and Recognizing Patterns
+ Modified from an RPM solving project 
+
+Solving RPM and Recognizing Patterns

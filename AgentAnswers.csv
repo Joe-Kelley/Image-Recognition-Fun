@@ -1,3 +1,13 @@
-Problem Name,Agent's Answer
-Basic Problem 1,2
-Basic Problem 2,4
+Problem Name,Agent's Answer,Actual Answer
+Basic Problem 1,2,2
+Basic Problem 2,5,5
+Basic Problem 3,1,1
+Basic Problem 4,3,3
+Basic Problem 5,4,4
+Basic Problem 6,2,5
+Basic Problem 7,5,6
+Basic Problem 8,2,6
+Basic Problem 9,0,5
+Basic Problem 10,3,3
+Basic Problem 11,1,1
+Basic Problem 12,0,1
